@@ -47,7 +47,7 @@ import groovy.json.JsonOutput
 import java.net.URLEncoder
 
 metadata {
-	definition(name: "Moodo API", namespace: "guysprackland", author: "Guy Sprackland", importUrl: "") {
+	definition(name: "Moodo API", namespace: "guysprackland", author: "Guy Sprackland", importUrl: "https://raw.githubusercontent.com/GuySprackland/hubitat-moodo/main/moodoAPI.groovy") {
 
 		capability "Initialize"
 		capability "Refresh"

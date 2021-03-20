@@ -25,7 +25,7 @@ import groovy.json.JsonOutput
 
 metadata
 {
-    definition(name: "Moodo box", namespace: "guysprackland", author: "Guy Sprackland", importUrl: "")
+    definition(name: "Moodo box", namespace: "guysprackland", author: "Guy Sprackland", importUrl: "https://raw.githubusercontent.com/GuySprackland/hubitat-moodo/main/moodoBox.groovy")
     {
 	capability "Actuator"
         capability "Switch"
