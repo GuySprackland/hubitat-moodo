@@ -22,7 +22,7 @@
 
 metadata
 {
-    definition(name: "Moodo slot", namespace: "guysprackland", author: "Guy Sprackland", importUrl: "")
+    definition(name: "Moodo slot", namespace: "guysprackland", author: "Guy Sprackland", importUrl: "https://raw.githubusercontent.com/GuySprackland/hubitat-moodo/main/moodoSlot.groovy")
     {
         capability "Switch"
 	capability "SwitchLevel"
