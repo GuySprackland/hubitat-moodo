@@ -14,6 +14,8 @@
 **
 **
 ** Version	Date		By	Why
+** V0.1		21-Mar-2021	GNS	Default logs off, fix typo, error check create child
+**					Make email and password required in connect command
 ** V0.0		17-Mar-2021	GNS	Initial functionality complete (ish)
 **
 */ 
@@ -32,7 +34,7 @@
 // for each box named whatever you called it when you set it up. The device is a dimmer and switch and
 // also has some custom commands for controlling the other features of the box.
 //
-// The driver does not store your credentials or need them again unless you disconnect from Moodo.
+// The driver does not store your credentials nor need them again unless you disconnect from Moodo.
 //
 // Each Moodo box device has 4 child devices of its own for controlling the fans in each slot individually.
 //
@@ -52,7 +54,7 @@ metadata {
 		capability "Initialize"
 		capability "Refresh"
 
-		command "connect", [[name:"Email", type: "STRING", description: "Moodo registered email address", constraints: ["STRING"]], [name:"Password", type: "STRING", description: "Moodo password", constraints: ["STRING"]]]
+		command "connect", [[name:"Email*", type: "STRING", description: "Moodo registered email address", constraints: ["STRING"]], [name:"Password*", type: "STRING", description: "Moodo password", constraints: ["STRING"]]]
 		command "disconnect"
 
 		attribute "loginStatus", "NUMBER"
@@ -62,7 +64,7 @@ metadata {
 
 preferences {
 	section {
-		input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: true
+		input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: false
         	input name: "pollInterval", type: "number", title: "Poll interval in seconds", defaultValue: 600
 	}
 }
@@ -86,7 +88,7 @@ void uninstalled() {
 	if (state.authToken) {
 		logout()
 	}
-	deleteChidren()
+	deleteChildren()
 }
 
 void updated() {
@@ -151,10 +153,13 @@ void connect(user, password) {
 
 	def result
 	String token
-	def params = /{"email": "/ + user + /", "password": "/ + password + /"}/
-//	def socketheaders = ["Content-Type" : "application/json"]
 
-	result = moodo("post" , "login", null , params, false)
+	def request = [:]
+
+	request.email = user
+	request.password = password
+
+	result = moodo("post" , "login", null , JsonOutput.toJson(request), false)
 
 	if (result) {
 		token = result?.token
@@ -165,6 +170,8 @@ void connect(user, password) {
 
 		runIn (1, refresh)			// Give it a chance to settle. Otherwise first read of child box details fails with not available.
 
+//		def socketheaders = ["Content-Type" : "application/json"]
+//
 //		log.debug "Before websocket connect"
 //		try {
 //			interfaces.webSocket.connect("wss://ws.moodo.co:9090/", pingInterval: 60, headers: socketheaders)
@@ -510,14 +517,14 @@ def getKey(childId) {
 	return childId?.substring(6)
 }
 
-def getID(boxKey) {
+String getID(boxKey) {
 	return "Moodo_" + boxKey
 }
 
 void createChildren() {
 
-	def childId
-	def childDevice
+	String					childId
+	com.hubitat.app.ChildDeviceWrapper	childDevice
 
 	state.boxes?.each {
 
@@ -527,7 +534,13 @@ void createChildren() {
 			if (!(childDevice = getChildDevice(childId))) {
 
 				if (logEnable) log.debug "Creating " + it.name
-				childDevice = addChildDevice("Moodo box", childId, [label: it.name, isComponent: false])
+				try {
+					childDevice = addChildDevice("Moodo box", childId, [label: it.name, isComponent: false])
+				}
+				catch (Exception e) {
+					log.debug "Problem creating child device: " + e.message
+					childDevice = null
+				}
 			}
 			childDevice?.refresh()
 		}
@@ -535,6 +548,19 @@ void createChildren() {
 }
 
 void deleteChildren() {
+
+//	List<com.hubitat.app.ChildDeviceWrapper> childDevices = getChildDevices()
+
+//	String networkId
+
+//	childDevices?.each {
+//		networkId = it?.getDeviceNetworkId()
+
+//		if (networkId) {
+//			deleteChildDevice(networkId)
+//		}
+//	}
+
 
 	def childId
 
