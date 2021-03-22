@@ -14,6 +14,7 @@
 **
 **
 ** Version	Date		By	Why
+** V0.2		22-Mar-2021	GNS	Make poll interval setting a command not a preference, fix installation bug
 ** V0.1		21-Mar-2021	GNS	Default logs off, fix typo, error check create child
 **					Make email and password required in connect command
 ** V0.0		17-Mar-2021	GNS	Initial functionality complete (ish)
@@ -53,11 +54,16 @@ metadata {
 
 		capability "Initialize"
 		capability "Refresh"
+		capability "Actuator"
+		capability "Switch"
 
 		command "connect", [[name:"Email*", type: "STRING", description: "Moodo registered email address", constraints: ["STRING"]], [name:"Password*", type: "STRING", description: "Moodo password", constraints: ["STRING"]]]
 		command "disconnect"
 
+		command "setPollInterval", [[name:"Interval*", type: "NUMBER", description: "Poll interval in seconds or 0 for no polling", constraints: ["NUMBER"]]]
+
 		attribute "loginStatus", "NUMBER"
+		attribute "pollInterval", "NUMBER"
 
 	}
 }
@@ -65,7 +71,6 @@ metadata {
 preferences {
 	section {
 		input name: "logEnable", type: "bool", title: "Enable debug logging", defaultValue: false
-        	input name: "pollInterval", type: "number", title: "Poll interval in seconds", defaultValue: 600
 	}
 }
 
@@ -78,9 +83,15 @@ void installed() {
 	log.warn "Installed"
     
 //	Initialise state variables
+
 //	Initialise attributes
 
-	configure()
+	updateDataValue("pollInterval", "0")
+
+	sendEvent(name: "loginStatus", value: 0)
+	sendEvent(name: "switch", value: "on")
+	sendEvent(name: "pollInterval", value: 0)
+
 }
 
 void uninstalled() {
@@ -97,7 +108,6 @@ void updated() {
 	log.warn "debug logging is: ${logEnable == true}"
 	if (logEnable) runIn(1800, logsOff)
 
-	refresh()
 }
 
 // For those idle moments when I get round to adding the websockets support
@@ -118,7 +128,18 @@ def webSocketStatus(String message) {
 
 void initialize() {
 
-	def token = GetDataValue("token")
+	String pollInterval = getDataValue("pollInterval")
+
+	if (pollInterval) {
+		Integer interval = pollInterval.toInteger()
+
+		sendEvent(name: "pollInterval", value: interval)
+		sendEvent(name: "switch", value: "on")
+	} else {
+		sendEvent(name: "switch", value: "off")
+	}
+
+	def token = getDataValue("token")
 
 	if (token) {
 		state.authToken = token
@@ -128,6 +149,9 @@ void initialize() {
 		state.clear()
 		sendEvent(name: "loginStatus", value: 0)
 	}
+
+	refresh()
+
 }
 
 void refresh() {
@@ -140,9 +164,32 @@ void refresh() {
 		createChildren()
 	}
 
-	if (pollInterval > 0) {
-		runIn (pollInterval, refresh)				// Bodge only
+	def pollInterval = device.currentValue("pollInterval")
+	def pollOn = device.currentValue("switch")
+
+	if (pollOn == "on") {
+		if (pollInterval) {
+			Integer interval = pollInterval.toInteger()
+
+			if (interval > 0) {
+				runIn (interval, refresh)
+			}
+		}
 	}
+}
+
+void on() {
+
+	sendEvent(name: "switch", value: "on")
+
+	runIn(5, refresh)
+}
+
+void off() {
+
+	unschedule(refresh)
+
+	sendEvent(name: "switch", value: "off")
 }
 
 //
@@ -193,9 +240,26 @@ void disconnect() {
 
 //	interfaces.webSocket.close()
 	moodo("post", "logout")
-	sendEvent(name: "loginStatus", value: 0, isStateChange: false)
+	sendEvent(name: "loginStatus", value: 0)
 	state.authToken = ""
 	removeDataValue("token")
+}
+
+void setPollInterval(intervalReq) {
+
+	if (intervalReq < Integer.MAX_VALUE) {
+		Integer interval = intervalReq.intValue()
+
+		if (interval > 0) {
+			runIn(interval.toInteger(), refresh)
+			sendEvent(name: "pollInterval", value: interval)
+			updateDataValue("pollInterval", interval.toString())
+		} else {
+			unschedule(refresh)
+			sendEvent(name: "pollInterval", value: 0)
+			updateDataValue("pollInterval", "0")
+		}
+	}
 }
 
 //
